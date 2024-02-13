@@ -32,8 +32,31 @@ from tensorflow.python import debug as tf_debug
 FLAGS = tf.app.flags.FLAGS
 
 # Where to find data
-tf.app.flags.DEFINE_string('data_path', '', 'Path expression to tf.Example datafiles. Can include wildcards to access multiple datafiles.')
-tf.app.flags.DEFINE_string('vocab_path', '', 'Path expression to text vocabulary file.')
+
+Certainly! Here's the modified code with changes for TensorFlow 2.x:
+
+python
+Copy code
+import sys
+import time
+import os
+import tensorflow as tf
+import numpy as np
+from collections import namedtuple
+from data import Vocab
+from batcher import Batcher
+from model import SummarizationModel
+from decode import BeamSearchDecoder
+import util
+from tensorflow.python import debug as tf_debug
+
+FLAGS = tf.compat.v1.flags.FLAGS
+
+# Where to find data
+tf.compat.v1.flags.DEFINE_string('data_path', '', 'Path expression to tf.Example datafiles. Can include wildcards to access multiple datafiles.')
+tf.compat.v1.flags.DEFINE_string('vocab_path', '', 'Path expression to text vocabulary file.')
+
+# ... (rest of the flags remain unchanged)
 
 # Important settings
 tf.app.flags.DEFINE_string('mode', 'train', 'must be one of train/eval/decode')
@@ -265,60 +288,38 @@ def run_eval(model, batcher, vocab):
 
 
 def main(unused_argv):
-  if len(unused_argv) != 1: # prints a message if you've entered flags incorrectly
-    raise Exception("Problem with flags: %s" % unused_argv)
+    if len(unused_argv) != 1:
+        raise Exception("Problem with flags: %s" % unused_argv)
 
-  tf.compat.v1.logging.set_verbosity(tf.logging.INFO) # choose what level of logging you want
-  tf.compat.v1.logging.INFO('Starting seq2seq_attention in %s mode...', (FLAGS.mode))
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.INFO)
 
-  # Change log_root to FLAGS.log_root/FLAGS.exp_name and create the dir if necessary
-  FLAGS.log_root = os.path.join(FLAGS.log_root, FLAGS.exp_name)
-  if not os.path.exists(FLAGS.log_root):
-    if FLAGS.mode=="train":
-      os.makedirs(FLAGS.log_root)
+    tf.compat.v1.logging.info('Starting seq2seq_attention in %s mode...', (FLAGS.mode))
+
+    FLAGS.log_root = os.path.join(FLAGS.log_root, FLAGS.exp_name)
+    if not os.path.exists(FLAGS.log_root):
+        if FLAGS.mode == "train":
+            os.makedirs(FLAGS.log_root)
+        else:
+            raise Exception("Logdir %s doesn't exist. Run in train mode to create it." % (FLAGS.log_root))
+
+    vocab = Vocab(FLAGS.vocab_path, FLAGS.vocab_size)
+
+    if FLAGS.mode == 'train':
+        print("creating model...")
+        model = SummarizationModel(FLAGS, vocab)
+        setup_training(model, batcher)
+    elif FLAGS.mode == 'eval':
+        model = SummarizationModel(FLAGS, vocab)
+        run_eval(model, batcher, vocab)
+    elif FLAGS.mode == 'decode':
+        decode_model_flags = FLAGS
+        decode_model_flags.batch_size = decode_model_flags.beam_size
+        decode_model_flags.max_dec_steps = 1
+        model = SummarizationModel(decode_model_flags, vocab)
+        decoder = BeamSearchDecoder(model, batcher, vocab)
+        decoder.decode()
     else:
-      raise Exception("Logdir %s doesn't exist. Run in train mode to create it." % (FLAGS.log_root))
-
-  vocab = Vocab(FLAGS.vocab_path, FLAGS.vocab_size) # create a vocabulary
-
-  # If in decode mode, set batch_size = beam_size
-  # Reason: in decode mode, we decode one example at a time.
-  # On each step, we have beam_size-many hypotheses in the beam, so we need to make a batch of these hypotheses.
-  if FLAGS.mode == 'decode':
-    FLAGS.batch_size = FLAGS.beam_size
-
-  # If single_pass=True, check we're in decode mode
-  if FLAGS.single_pass and FLAGS.mode!='decode':
-    raise Exception("The single_pass flag should only be True in decode mode")
-
-  # Make a namedtuple hps, containing the values of the hyperparameters that the model needs
-  hparam_list = ['mode', 'lr', 'adagrad_init_acc', 'rand_unif_init_mag', 'trunc_norm_init_std', 'max_grad_norm', 'hidden_dim', 'emb_dim', 'batch_size', 'max_dec_steps', 'max_enc_steps', 'coverage', 'cov_loss_wt', 'pointer_gen']
-  hps_dict = {}
-  for key,val in FLAGS.flag_values_dict().items(): # for each flag
-    if key in hparam_list: # if it's in the list
-      hps_dict[key] = val # add it to the dict
-  hps = namedtuple("HParams", hps_dict.keys())(**hps_dict)
-
-  # Create a batcher object that will create minibatches of data
-  batcher = Batcher(FLAGS.data_path, vocab, hps, single_pass=FLAGS.single_pass)
-
-  tf.compat.v1.set_random_seed(111) # a seed value for randomness
-
-  if hps.mode == 'train':
-    print("creating model...")
-    model = SummarizationModel(hps, vocab)
-    setup_training(model, batcher)
-  elif hps.mode == 'eval':
-    model = SummarizationModel(hps, vocab)
-    run_eval(model, batcher, vocab)
-  elif hps.mode == 'decode':
-    decode_model_hps = hps  # This will be the hyperparameters for the decoder model
-    decode_model_hps = hps._replace(max_dec_steps=1) # The model is configured with max_dec_steps=1 because we only ever run one step of the decoder at a time (to do beam search). Note that the batcher is initialized with max_dec_steps equal to e.g. 100 because the batches need to contain the full summaries
-    model = SummarizationModel(decode_model_hps, vocab)
-    decoder = BeamSearchDecoder(model, batcher, vocab)
-    decoder.decode() # decode indefinitely (unless single_pass=True, in which case deocde the dataset exactly once)
-  else:
-    raise ValueError("The 'mode' flag must be one of train/eval/decode")
+        raise ValueError("The 'mode' flag must be one of train/eval/decode")
 
 if __name__ == '__main__':
-  tf.compat.v1.app.run
+    tf.compat.v1.app.run()
