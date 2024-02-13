@@ -268,8 +268,8 @@ def main(unused_argv):
   if len(unused_argv) != 1: # prints a message if you've entered flags incorrectly
     raise Exception("Problem with flags: %s" % unused_argv)
 
-  tf.logging.set_verbosity(tf.logging.INFO) # choose what level of logging you want
-  tf.logging.info('Starting seq2seq_attention in %s mode...', (FLAGS.mode))
+  tf.compat.v1.logging.set_verbosity(tf.logging.INFO) # choose what level of logging you want
+  tf.compat.v1.logging.INFO('Starting seq2seq_attention in %s mode...', (FLAGS.mode))
 
   # Change log_root to FLAGS.log_root/FLAGS.exp_name and create the dir if necessary
   FLAGS.log_root = os.path.join(FLAGS.log_root, FLAGS.exp_name)
@@ -302,7 +302,7 @@ def main(unused_argv):
   # Create a batcher object that will create minibatches of data
   batcher = Batcher(FLAGS.data_path, vocab, hps, single_pass=FLAGS.single_pass)
 
-  tf.set_random_seed(111) # a seed value for randomness
+  tf.compat.v1.set_random_seed(111) # a seed value for randomness
 
   if hps.mode == 'train':
     print("creating model...")
@@ -321,4 +321,4 @@ def main(unused_argv):
     raise ValueError("The 'mode' flag must be one of train/eval/decode")
 
 if __name__ == '__main__':
-  tf.app.run()
+  tf.compat.v1.app.run
