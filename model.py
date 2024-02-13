@@ -21,7 +21,7 @@ import time
 import numpy as np
 import tensorflow as tf
 from attention_decoder import attention_decoder
-from tensorflow.compat.v1.contrib.tensorboard.plugins import projector
+from tensorboard.plugins import projector
 
 class SummarizationModel(tf.Module):
     def __init__(self, hps, vocab):
